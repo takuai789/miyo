@@ -300,9 +300,9 @@
     <label class="lbl">パターン</label>
     <div class="cats" id="epCats"></div>
     <label class="lbl">はじまり</label>
-    <input type="datetime-local" class="dt-in" id="epStart" />
+    <input type="datetime-local" class="dt-in" id="epStart" step="1800" />
     <label class="lbl">おわり <small>（空なら、まだつづいている）</small></label>
-    <input type="datetime-local" class="dt-in" id="epEnd" />
+    <input type="datetime-local" class="dt-in" id="epEnd" step="1800" />
     <button class="clr" id="epClr">おわりを空にする</button>
     <button class="del" id="epDel">このきろくを削除</button>
   </div>
@@ -314,7 +314,7 @@
     <h3 id="tTitle"></h3>
     <p class="sub" id="tSub"></p>
     <div class="tchips" id="tChips"></div>
-    <input type="datetime-local" class="dt-in" id="tIn" />
+    <input type="datetime-local" class="dt-in" id="tIn" step="1800" />
     <div class="row"><button class="cancel" id="tCancel">やめる</button><button class="ok" id="tOk">記録する</button></div>
   </div>
 </div>
@@ -325,7 +325,7 @@
 <script>
 (() => {
   'use strict';
-  const APP_VERSION = '1.6.0';
+  const APP_VERSION = '1.7.0';
   const KEY = 'miyo.v1', BK_KEY = 'miyo.lastBackupAt', SCHEMA = 'miyo.v1', MAX = 8;
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -497,15 +497,18 @@
     return mdw(e.start) + ' ' + hm(e.start) + ' → ' + (sameDay(e.start, e.end) ? '' : mdw(e.end) + ' ') + hm(e.end);
   }
   // いつ？（あとから気づくことが多いので、いま／◯分前／好きな時刻を選べる）
-  const AGO = [['いま', 0], ['15分前', 15], ['30分前', 30], ['1時間前', 60], ['2時間前', 120], ['3時間前', 180], ['5時間前', 300], ['半日前', 720]];
+  // 時刻は30分単位（細かい記録はいらない）
+  const HALF = 1800000;
+  const r30 = (t) => Math.round(t / HALF) * HALF;
+  const AGO = [['いま', 0], ['30分前', 30], ['1時間前', 60], ['1時間半前', 90], ['2時間前', 120], ['3時間前', 180], ['4時間前', 240], ['半日前', 720]];
   let tResolve = null, tMin = 0;
   function askTime(title, sub, min) {
     tMin = min || 0;
     const now = Date.now();
-    const ok = AGO.filter(([, m]) => now - m * 60000 >= tMin);
+    const ok = AGO.filter(([, m]) => r30(now - m * 60000) >= r30(tMin));
     $('tTitle').textContent = title; $('tSub').textContent = sub || '';
     $('tChips').innerHTML = ok.map(([l, m], i) => '<button data-m="' + m + '" class="' + (i === 0 ? 'on' : '') + '">' + l + '</button>').join('');
-    $('tIn').value = toLocal(now);
+    $('tIn').value = toLocal(r30(now));
     $('tSheet').classList.add('show');
     return new Promise((r) => { tResolve = r; });
   }
@@ -513,27 +516,28 @@
   $('tChips').addEventListener('click', (e) => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     $('tChips').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
-    $('tIn').value = toLocal(Date.now() - +b.dataset.m * 60000);
+    $('tIn').value = toLocal(r30(Date.now() - +b.dataset.m * 60000));
   });
   $('tIn').addEventListener('input', () => $('tChips').querySelectorAll('button').forEach((x) => x.classList.remove('on')));
   $('tCancel').onclick = () => closeT(null);
   $('tSheet').addEventListener('click', (e) => { if (e.target === $('tSheet')) closeT(null); });
   $('tOk').onclick = () => {
     const on = $('tChips').querySelector('.on');
-    const t = on ? Date.now() - +on.dataset.m * 60000 : fromLocal($('tIn').value);
-    if (!t) { toast('時刻を入れてください'); return; }
-    if (t > Date.now() + 60000) { toast('まだ来ていない時刻です'); return; }
-    if (t < tMin - 60000) { toast('はじまりより前になっています'); return; }
-    closeT(Math.max(t, tMin));
+    const raw = on ? Date.now() - +on.dataset.m * 60000 : fromLocal($('tIn').value);
+    if (!raw) { toast('時刻を入れてください'); return; }
+    const t = r30(raw);
+    if (t > r30(Date.now())) { toast('まだ来ていない時刻です'); return; }
+    if (tMin && t < r30(tMin)) { toast('はじまりより前になっています'); return; }
+    closeT(t);
   };
   async function startEp(pid) {
     const a = active();
     if (a && a.pid === pid) return false;
     const p = pById(pid);
-    const t = await askTime('いつから「' + p.name + '」？', 'あとから気づいたときは、だいたいでOK', 0);
+    const t = await askTime('いつから「' + p.name + '」？', '30分単位。あとから気づいたときは、だいたいでOK', 0);
     if (t == null) return false;
     let msg = 'はじまりを記録しました（' + hm(t) + '〜）';
-    if (a) { a.end = Math.max(a.start, t); a.updatedAt = Date.now(); const ap = pById(a.pid); msg = '「' + (ap ? ap.name : '') + '」を終わりにして、こちらを始めました'; }
+    if (a) { a.end = Math.max(a.start + HALF, t); a.updatedAt = Date.now(); const ap = pById(a.pid); msg = '「' + (ap ? ap.name : '') + '」を終わりにして、こちらを始めました'; }
     data.eps.push({ id: uid(), pid, start: t, end: null, updatedAt: Date.now() });
     save(); toast(msg); return true;
   }
@@ -542,7 +546,7 @@
     const p = pById(a.pid);
     const t = await askTime('いつ抜けた？', (p ? '「' + p.name + '」' : '') + hm(a.start) + 'から', a.start);
     if (t == null) return false;
-    a.end = t; a.updatedAt = Date.now(); save();
+    a.end = Math.max(t, a.start + HALF); a.updatedAt = Date.now(); save();
     toast('おわりを記録しました（' + durText(a.end - a.start) + '）'); return true;
   }
   function renderNow() {
@@ -614,7 +618,7 @@
   function renderEpCats() { $('epCats').innerHTML = data.patterns.map((p) => '<button data-k="' + p.id + '" class="' + (p.id === epPid ? 'on' : '') + '">' + catSvg(p.cat, p.color) + esc(p.name) + '</button>').join(''); }
   $('epCats').addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b) { epPid = b.dataset.k; renderEpCats(); } });
   function openEp(id) {
-    const e = id ? data.eps.find((x) => x.id === id) : { pid: (data.patterns[0] || {}).id, start: Date.now() - 3600000, end: Date.now() };
+    const e = id ? data.eps.find((x) => x.id === id) : { pid: (data.patterns[0] || {}).id, start: r30(Date.now()) - 2 * HALF, end: r30(Date.now()) };
     if (!e || !e.pid) { toast('先にパターンを作ってください'); return; }
     epId = id; epPid = e.pid; renderEpCats();
     $('epTitle').textContent = id ? 'きろくを直す' : 'あとからきろく'; $('epDel').style.display = id ? '' : 'none';
@@ -627,9 +631,10 @@
   $('epClr').onclick = () => { $('epEnd').value = ''; };
   $('epSave').onclick = () => {
     let e = epId ? data.eps.find((x) => x.id === epId) : { id: uid() }; if (!e) return closeEp();
-    const st = fromLocal($('epStart').value), en = fromLocal($('epEnd').value);
+    const st0 = fromLocal($('epStart').value), en0 = fromLocal($('epEnd').value);
+    const st = st0 && r30(st0), en = en0 && r30(en0);
     if (!st) { toast('はじまりを入れてください'); return; }
-    if (en && en < st) { toast('おわりが、はじまりより前になっています'); return; }
+    if (en && en <= st) { toast('おわりは、はじまりより後にしてください'); return; }
     if (!en && data.eps.some((x) => x.id !== e.id && !x.end)) { toast('「いま」のきろくは1つだけです。おわりを入れてください'); return; }
     Object.assign(e, { pid: epPid, start: st, end: en, updatedAt: Date.now() });
     if (!epId) data.eps.push(e);
