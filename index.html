@@ -152,6 +152,14 @@
   .vlist { background: var(--card); border-radius: 16px; overflow: hidden; }
   .vrow { padding: 13px 16px; border-bottom: .5px solid var(--sep); font-size: 15.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; cursor: pointer; }
   .vrow:last-child { border-bottom: 0; }
+  /* miyoについて */
+  .about-btn { border: 0; background: var(--fill); color: var(--ink); font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 999px; cursor: pointer; margin-bottom: 6px; }
+  .about .pn { text-align: center; padding-top: 26px; }
+  .about img { width: 76px; height: 76px; border-radius: 20px; display: block; margin: 0 auto 14px; }
+  .tsheet.about h3 { font-size: 20px; margin-bottom: 14px; }
+  .about .txt { font-size: 16px; line-height: 1.95; color: var(--ink); margin-bottom: 20px; }
+  .about .txt b { font-weight: 700; }
+  .about .ok { width: 100%; border: 0; border-radius: 14px; padding: 14px; font-size: 16px; font-weight: 700; background: #2B2A33; color: #fff; cursor: pointer; }
   /* いつ？シート */
   .tsheet { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.32); display: flex; align-items: flex-end; opacity: 0; pointer-events: none; transition: opacity .2s; }
   .tsheet.show { opacity: 1; pointer-events: auto; }
@@ -208,6 +216,7 @@
 <div class="shell">
   <header>
     <h1 class="brand"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%23E3B23C'/%3E%3Ccircle cx='256' cy='270' r='150' fill='%232B2A33'/%3E%3Cpath d='M168 168 L178 98 L232 146 Z M286 140 L330 92 L330 166 Z' fill='%232B2A33'/%3E%3Cpath d='M120 330 C150 420 330 440 392 360' fill='none' stroke='%233E3D48' stroke-width='46' stroke-linecap='round'/%3E%3Cpath d='M196 248 q16 14 32 0 M270 248 q16 14 32 0' fill='none' stroke='%23E3B23C' stroke-width='9' stroke-linecap='round'/%3E%3C/svg%3E" alt="" />miyo</h1>
+    <button class="about-btn" id="aboutBtn">miyoについて</button>
   </header>
   <nav class="tabs" id="tabs"><button data-t="p" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>パターン</button><button data-t="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>きろく</button><button data-t="v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9.5L5.6 4l4 3.2h4.8L18.4 4l.6 5.5c.9 1.2 1.5 2.6 1.5 4.1 0 3.8-3.8 6.4-8.5 6.4s-8.5-2.6-8.5-6.4c0-1.5.6-2.9 1.5-4.1z"/><path d="M9 13.2h.01M15 13.2h.01" stroke-width="2.6"/></svg>miyoのこえ</button><button data-t="m"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5l5 5L9 20H4v-5z"/><path d="M12.5 6.5l5 5"/></svg>メモ</button></nav>
   <div id="tabP">
@@ -308,6 +317,16 @@
   </div>
 </div>
 
+<!-- miyoについて -->
+<div class="tsheet about" id="aboutSheet">
+  <div class="pn">
+    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%23E3B23C'/%3E%3Ccircle cx='256' cy='270' r='150' fill='%232B2A33'/%3E%3Cpath d='M168 168 L178 98 L232 146 Z M286 140 L330 92 L330 166 Z' fill='%232B2A33'/%3E%3Cpath d='M120 330 C150 420 330 440 392 360' fill='none' stroke='%233E3D48' stroke-width='46' stroke-linecap='round'/%3E%3Cpath d='M196 248 q16 14 32 0 M270 248 q16 14 32 0' fill='none' stroke='%23E3B23C' stroke-width='9' stroke-linecap='round'/%3E%3C/svg%3E" alt="" />
+    <h3>miyo は、あなたを映すネコ</h3>
+    <p class="txt">疲れているとき、イライラしているとき、<br>なにもしたくないとき。<br>miyo は、そのときのあなたの<br>いろんな様子を映します。<br><br><b>でも、それを変だと思わないで。</b><br>どれも、あなたによくあるパターンのひとつ。<br>いつかちゃんと抜けられるし、<br>そのときどうすればいいかは、<br>ここに書いてあります。</p>
+    <button class="ok" id="aboutOk">わかった</button>
+  </div>
+</div>
+
 <!-- いつ？ -->
 <div class="tsheet" id="tSheet">
   <div class="pn">
@@ -325,7 +344,7 @@
 <script>
 (() => {
   'use strict';
-  const APP_VERSION = '1.7.0';
+  const APP_VERSION = '1.8.0';
   const KEY = 'miyo.v1', BK_KEY = 'miyo.lastBackupAt', SCHEMA = 'miyo.v1', MAX = 8;
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -382,7 +401,7 @@
     renderNow();
     const el = $('home');
     if (!data.patterns.length) {
-      el.innerHTML = '<div class="empty"><h2>なにかあったときに、見るところ</h2>疲れたときや調子がくずれたときの<br>よくあるパターンごとに、<br>自分がどうなるか・おすすめの行動・<br>どのくらい続くかをまとめておけます。<br>パターンは8つまで。<div class="btns"><button class="pbtn" id="emptyAdd">パターンを作る</button><button class="gbtn" id="emptySample">例を3つ入れて試す</button></div></div>';
+      el.innerHTML = '<div class="empty"><h2>miyo は、あなたを映すネコ</h2>いろんな様子を映すけど、それを変だと思わないで。<br><br>疲れたときや調子がくずれたときの<br>よくあるパターンごとに、<br>自分がどうなるか・おすすめの行動・<br>どのくらい続くかをまとめておけます。<br>パターンは8つまで。<div class="btns"><button class="pbtn" id="emptyAdd">パターンを作る</button><button class="gbtn" id="emptySample">例を3つ入れて試す</button></div></div>';
       return;
     }
     let h = '<div class="grid">' + data.patterns.map((p) =>
@@ -644,6 +663,15 @@
     if (!(await uiAsk('このきろくを削除しますか？', '削除する'))) return;
     data.eps = data.eps.filter((x) => x.id !== epId); afterEp();
   };
+
+  // ---------- miyoについて ----------
+  const ABOUT_KEY = 'miyo.aboutSeen';
+  const openAbout = () => $('aboutSheet').classList.add('show');
+  const closeAbout = () => { $('aboutSheet').classList.remove('show'); try { localStorage.setItem(ABOUT_KEY, '1'); } catch (e) {} };
+  $('aboutBtn').onclick = openAbout;
+  $('aboutOk').onclick = closeAbout;
+  $('aboutSheet').addEventListener('click', (e) => { if (e.target === $('aboutSheet')) closeAbout(); });
+  try { if (!localStorage.getItem(ABOUT_KEY)) setTimeout(openAbout, 400); } catch (e) {}
 
   // ---------- miyoのこえ ----------
   let voiceId = null;
