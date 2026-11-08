@@ -152,6 +152,20 @@
   .vlist { background: var(--card); border-radius: 16px; overflow: hidden; }
   .vrow { padding: 13px 16px; border-bottom: .5px solid var(--sep); font-size: 15.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; cursor: pointer; }
   .vrow:last-child { border-bottom: 0; }
+  /* いつ？シート */
+  .tsheet { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.32); display: flex; align-items: flex-end; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .tsheet.show { opacity: 1; pointer-events: auto; }
+  .tsheet .pn { width: 100%; max-width: 560px; margin: 0 auto; background: var(--bg); border-radius: 22px 22px 0 0; padding: 18px 16px calc(var(--safe-bottom) + 16px); transform: translateY(100%); transition: transform .28s cubic-bezier(.2,.8,.2,1); }
+  .tsheet.show .pn { transform: none; }
+  .tsheet h3 { font-size: 17px; text-align: center; margin-bottom: 4px; }
+  .tsheet .sub { font-size: 12.5px; color: var(--muted); text-align: center; margin-bottom: 14px; }
+  .tchips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+  .tchips button { border: 0; border-radius: 12px; background: var(--card); padding: 11px 4px; font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; }
+  .tchips button.on { background: var(--ink); color: #fff; }
+  .tsheet .row { display: flex; gap: 8px; margin-top: 14px; }
+  .tsheet .row button { flex: 1; border: 0; border-radius: 14px; padding: 14px; font-size: 16px; font-weight: 700; cursor: pointer; }
+  .tsheet .cancel { background: var(--fill); color: var(--ink); }
+  .tsheet .ok { background: var(--accent); color: #fff; }
   /* メモ */
   .memo { width: 100%; min-height: calc(100vh - 290px); border: 0; border-radius: 16px; background: var(--card); padding: 16px; font-size: 17px; line-height: 1.75; color: var(--ink); outline: none; resize: none; display: block; }
   .memo-st { font-size: 12px; color: var(--muted); margin: 8px 6px 0; min-height: 1.4em; }
@@ -294,13 +308,24 @@
   </div>
 </div>
 
+<!-- いつ？ -->
+<div class="tsheet" id="tSheet">
+  <div class="pn">
+    <h3 id="tTitle"></h3>
+    <p class="sub" id="tSub"></p>
+    <div class="tchips" id="tChips"></div>
+    <input type="datetime-local" class="dt-in" id="tIn" />
+    <div class="row"><button class="cancel" id="tCancel">やめる</button><button class="ok" id="tOk">記録する</button></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <button id="updateBanner">新しいバージョンがあります — タップで更新</button>
 
 <script>
 (() => {
   'use strict';
-  const APP_VERSION = '1.5.0';
+  const APP_VERSION = '1.6.0';
   const KEY = 'miyo.v1', BK_KEY = 'miyo.lastBackupAt', SCHEMA = 'miyo.v1', MAX = 8;
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -471,18 +496,54 @@
     if (!e.end) return mdw(e.start) + ' ' + hm(e.start) + ' 〜 いまも';
     return mdw(e.start) + ' ' + hm(e.start) + ' → ' + (sameDay(e.start, e.end) ? '' : mdw(e.end) + ' ') + hm(e.end);
   }
-  function startEp(pid) {
-    const a = active(), now = Date.now();
-    if (a && a.pid === pid) return;
-    let msg = 'はじまりを記録しました';
-    if (a) { a.end = now; a.updatedAt = now; const ap = pById(a.pid); msg = '「' + (ap ? ap.name : '') + '」を終わりにして、こちらを始めました'; }
-    data.eps.push({ id: uid(), pid, start: now, end: null, updatedAt: now });
-    save(); toast(msg);
+  // いつ？（あとから気づくことが多いので、いま／◯分前／好きな時刻を選べる）
+  const AGO = [['いま', 0], ['15分前', 15], ['30分前', 30], ['1時間前', 60], ['2時間前', 120], ['3時間前', 180], ['5時間前', 300], ['半日前', 720]];
+  let tResolve = null, tMin = 0;
+  function askTime(title, sub, min) {
+    tMin = min || 0;
+    const now = Date.now();
+    const ok = AGO.filter(([, m]) => now - m * 60000 >= tMin);
+    $('tTitle').textContent = title; $('tSub').textContent = sub || '';
+    $('tChips').innerHTML = ok.map(([l, m], i) => '<button data-m="' + m + '" class="' + (i === 0 ? 'on' : '') + '">' + l + '</button>').join('');
+    $('tIn').value = toLocal(now);
+    $('tSheet').classList.add('show');
+    return new Promise((r) => { tResolve = r; });
   }
-  function endEp() {
-    const a = active(); if (!a) return;
-    a.end = Date.now(); a.updatedAt = a.end; save();
-    toast('おわりを記録しました（' + durText(a.end - a.start) + '）');
+  const closeT = (v) => { $('tSheet').classList.remove('show'); if (document.activeElement) document.activeElement.blur(); const r = tResolve; tResolve = null; if (r) r(v); };
+  $('tChips').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    $('tChips').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    $('tIn').value = toLocal(Date.now() - +b.dataset.m * 60000);
+  });
+  $('tIn').addEventListener('input', () => $('tChips').querySelectorAll('button').forEach((x) => x.classList.remove('on')));
+  $('tCancel').onclick = () => closeT(null);
+  $('tSheet').addEventListener('click', (e) => { if (e.target === $('tSheet')) closeT(null); });
+  $('tOk').onclick = () => {
+    const on = $('tChips').querySelector('.on');
+    const t = on ? Date.now() - +on.dataset.m * 60000 : fromLocal($('tIn').value);
+    if (!t) { toast('時刻を入れてください'); return; }
+    if (t > Date.now() + 60000) { toast('まだ来ていない時刻です'); return; }
+    if (t < tMin - 60000) { toast('はじまりより前になっています'); return; }
+    closeT(Math.max(t, tMin));
+  };
+  async function startEp(pid) {
+    const a = active();
+    if (a && a.pid === pid) return false;
+    const p = pById(pid);
+    const t = await askTime('いつから「' + p.name + '」？', 'あとから気づいたときは、だいたいでOK', 0);
+    if (t == null) return false;
+    let msg = 'はじまりを記録しました（' + hm(t) + '〜）';
+    if (a) { a.end = Math.max(a.start, t); a.updatedAt = Date.now(); const ap = pById(a.pid); msg = '「' + (ap ? ap.name : '') + '」を終わりにして、こちらを始めました'; }
+    data.eps.push({ id: uid(), pid, start: t, end: null, updatedAt: Date.now() });
+    save(); toast(msg); return true;
+  }
+  async function endEp() {
+    const a = active(); if (!a) return false;
+    const p = pById(a.pid);
+    const t = await askTime('いつ抜けた？', (p ? '「' + p.name + '」' : '') + hm(a.start) + 'から', a.start);
+    if (t == null) return false;
+    a.end = t; a.updatedAt = Date.now(); save();
+    toast('おわりを記録しました（' + durText(a.end - a.start) + '）'); return true;
   }
   function renderNow() {
     const a = active(), p = a && pById(a.pid);
@@ -490,7 +551,7 @@
     $('nowCard').innerHTML = '<div class="now" style="--c:' + p.color + '" data-open="' + p.id + '">' + catSvg(p.cat, p.color) + '<div class="tx"><small>いまのパターン</small><b>' + esc(p.name) + '</b><span>' + hm(a.start) + 'から・' + durText(Date.now() - a.start) + '</span></div><button data-end="1">おわった</button></div>';
   }
   $('nowCard').addEventListener('click', (e) => {
-    if (e.target.closest('[data-end]')) { endEp(); renderHome(); return; }
+    if (e.target.closest('[data-end]')) { endEp().then((ok) => { if (ok) renderHome(); }); return; }
     const t = e.target.closest('[data-open]'); if (t) openView(t.dataset.open);
   });
   function renderRun(p) {
@@ -499,12 +560,12 @@
       $('vRun').innerHTML = '<div class="st"><span>' + hm(a.start) + ' からこのパターン</span><b>' + durText(Date.now() - a.start) + '</b></div><button class="rbtn end" id="vEnd">■ 抜けた（おわり）</button>';
     } else {
       const other = a && pById(a.pid);
-      $('vRun').innerHTML = '<button class="rbtn" id="vStart">▶ いま、このパターンに入った</button>' + (other ? '<p class="rnote">いまの「' + esc(other.name) + '」は終わりになります</p>' : '');
+      $('vRun').innerHTML = '<button class="rbtn" id="vStart">▶ このパターンに入った</button>' + (other ? '<p class="rnote">いまの「' + esc(other.name) + '」は終わりになります</p>' : '');
     }
   }
   $('vRun').addEventListener('click', (e) => {
-    if (e.target.closest('#vStart')) { startEp(curId); renderView(); }
-    else if (e.target.closest('#vEnd')) { endEp(); renderView(); }
+    if (e.target.closest('#vStart')) startEp(curId).then((ok) => { if (ok) { renderView(); renderHome(); } });
+    else if (e.target.closest('#vEnd')) endEp().then((ok) => { if (ok) { renderView(); renderHome(); } });
   });
   function stats(list) {
     const done = list.filter((x) => x.end);
@@ -517,7 +578,7 @@
   }
   function renderPast(p) {
     const list = data.eps.filter((x) => x.pid === p.id).sort((a, b) => b.start - a.start);
-    if (!list.length) { $('vPast').innerHTML = '<div class="sec">このパターンのきろく</div><div class="none">「いま、このパターンに入った」を押すと、はじまりとおわりが残ります。</div>'; return; }
+    if (!list.length) { $('vPast').innerHTML = '<div class="sec">このパターンのきろく</div><div class="none">「このパターンに入った」を押すと、はじまりとおわりが残ります。</div>'; return; }
     const st = stats(list);
     $('vPast').innerHTML = '<div class="sec">このパターンのきろく</div><div class="stat"><div><small>回数</small><b>' + st.n + '回</b></div><div><small>ふつうの長さ</small><b>' + (st.done ? durText(st.avg) : '—') + '</b></div><div><small>いちばん長い</small><b>' + (st.done ? durText(st.max) : '—') + '</b></div></div><div class="eps">' + list.slice(0, 5).map(epRow).join('') + '</div>';
   }
@@ -531,7 +592,7 @@
     const list = data.eps.filter((x) => (x.end || Date.now()) >= since && pById(x.pid)).sort((a, b) => b.start - a.start);
     if (!list.length) {
       $('kSum').style.display = 'none';
-      $('kList').innerHTML = '<div class="empty" style="margin-top:4px">まだきろくがありません。<br>パターンを開いて「いま、このパターンに入った」を押すと、<br>はじまりとおわりがここに残ります。</div>';
+      $('kList').innerHTML = '<div class="empty" style="margin-top:4px">まだきろくがありません。<br>パターンを開いて「このパターンに入った」を押すと、<br>はじまりとおわりがここに残ります。</div>';
       return;
     }
     $('kSum').style.display = '';
